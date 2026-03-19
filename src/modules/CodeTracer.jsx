@@ -6,34 +6,48 @@ function highlightC(code) {
     'int', 'char', 'float', 'double', 'void', 'if', 'else', 'for', 'while',
     'return', 'struct', 'malloc', 'free', 'printf', 'NULL', 'sizeof',
   ]
-  // Process in a safe way using placeholder tokens to avoid double-replacement
-  let result = ''
+
+  // Apply a transform only to text nodes (not inside HTML tags)
+  function applyToText(html, transform) {
+    return html.replace(/(<[^>]*>)|([^<]+)/g, (match, tag, text) => {
+      if (tag) return tag
+      if (text) return transform(text)
+      return match
+    })
+  }
+
   const lines = code.split('\n')
   return lines.map(line => {
+    // HTML-escape first so < > & in C code don't corrupt span tag attributes
     let hl = line
-      // Comments first (before anything else)
-      .replace(/(\/\/.*$)/, '<span style="color:#6b7280;font-style:italic">$1</span>')
-    // Only process the non-comment part
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+
+    // Comments first
+    hl = hl.replace(/(\/\/.*$)/, '<span style="color:#6b7280;font-style:italic">$1</span>')
     const commentStart = hl.indexOf('<span style="color:#6b7280')
-    const safe = commentStart !== -1 ? hl.slice(0, commentStart) : hl
+    let safe = commentStart !== -1 ? hl.slice(0, commentStart) : hl
     const comment = commentStart !== -1 ? hl.slice(commentStart) : ''
 
-    let processed = safe
-      // Strings
-      .replace(/"([^"]*)"/g, '<span style="color:#22c55e">"$1"</span>')
-      // Numbers (not inside words)
-      .replace(/\b(\d+)\b/g, '<span style="color:#f59e0b">$1</span>')
+    // Strings
+    safe = applyToText(safe, t => t.replace(/"([^"]*)"/g, '<span style="color:#22c55e">"$1"</span>'))
+    // Numbers
+    safe = applyToText(safe, t => t.replace(/\b(\d+)\b/g, '<span style="color:#f59e0b">$1</span>'))
     // Keywords
     keywords.forEach(kw => {
-      processed = processed.replace(
+      safe = applyToText(safe, t => t.replace(
         new RegExp(`\\b${kw}\\b`, 'g'),
         `<span style="color:#60a5fa;font-weight:600">${kw}</span>`,
-      )
+      ))
     })
-    // Operators
-    processed = processed.replace(/([*&\-\+\[\]{}()=<>!])/g, '<span style="color:#f472b6">$1</span>')
-    // Types that are common (already handled by keywords but add pointer types style)
-    return processed + comment
+    // Operators — also match HTML-escaped < > & so they render colored
+    safe = applyToText(safe, t => t.replace(
+      /([*\-\+\[\]{}()=!]|&lt;|&gt;|&amp;)/g,
+      '<span style="color:#f472b6">$1</span>',
+    ))
+
+    return safe + comment
   }).join('\n')
 }
 
