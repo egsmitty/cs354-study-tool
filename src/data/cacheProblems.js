@@ -5,9 +5,9 @@ export const cacheProblems = [
     question:
       'Cache: S=4, E=1, B=4, m=8. Access sequence: 0x00, 0x01, 0x08, 0x00. How many misses?',
     options: ['1', '2', '3', '4'],
-    answer: 2,
+    answer: 1,
     explanation:
-      '0x00 → miss (cold). 0x01 → hit (same block as 0x00, offset differs). 0x08 → miss (different set). 0x00 → hit (still in cache, set 0). Total: 3 misses. Wait — 0x08 in binary for m=8: 00001000. b=log2(4)=2, s=log2(4)=2. offset=00, index=10=2, tag=00. 0x00: offset=00, index=00, tag=00. 0x01: offset=01, index=00, tag=00 → HIT. 0x08: offset=00, index=10=set2, tag=00 → MISS. 0x00: still in set0 → HIT. Total misses: 2.',
+      'b=log₂(4)=2, s=log₂(4)=2, t=4. 0x00=00|00|00→set0,tag0→MISS(cold). 0x01=00|00|01→set0,tag0→HIT(same block). 0x08=00|10|00→set2,tag0→MISS(cold). 0x00=00|00|00→set0,tag0→HIT(still cached). Total: 2 misses.',
   },
   {
     id: 2,
@@ -129,12 +129,12 @@ export const cacheProblems = [
   },
   {
     id: 13,
-    params: 'm=16, B=16, S=8, E=2',
-    question: 'Cache: m=16, B=16, S=8, E=2. How many tag bits are in each address?',
+    params: 'm=12, B=8, S=8, E=2',
+    question: 'Cache: m=12, B=8, S=8, E=2. How many tag bits are in each address?',
     options: ['4', '5', '6', '7'],
-    answer: 3,
+    answer: 2,
     explanation:
-      'b = log₂(B) = log₂(16) = 4. s = log₂(S) = log₂(8) = 3. t = m - s - b = 16 - 3 - 4 = 9 bits. Wait, let me recount: 16-3-4=9. But the answer is 9, which is not listed. Let me recheck: m=16, B=16→b=4, S=8→s=3, t=16-4-3=9. So 9 bits — but none match. Re-reading: options are 4,5,6,7. None is correct for this problem. Let me fix: m=12, B=8, S=8, E=2. b=3, s=3, t=12-3-3=6. Answer: 6.',
+      'b = log₂(B) = log₂(8) = 3. s = log₂(S) = log₂(8) = 3. t = m - s - b = 12 - 3 - 3 = 6 tag bits.',
   },
   {
     id: 14,
@@ -271,5 +271,169 @@ export const cacheProblems = [
     answer: 0,
     explanation:
       'b=log₂(4)=2, s=log₂(4)=2. Extract set bits (bits 2-3). 0x00=00000000: set=00=0. 0x10=00010000: set=00=0. 0x20=00100000: set=00=0. All three addresses map to set 0 — they differ only in tag bits. This causes conflict misses in a direct-mapped cache.',
+  },
+  {
+    id: 26,
+    params: 'Write-through traffic',
+    question:
+      'A write-through cache handles 100 store instructions, all hitting in cache. How many writes go to main memory?',
+    options: ['0', '100', '1', 'Depends on dirty bits'],
+    answer: 1,
+    explanation:
+      'Write-through sends every write to main memory in addition to updating the cache. 100 stores → 100 memory writes, regardless of hits. This is the main disadvantage of write-through: high memory traffic.',
+  },
+  {
+    id: 27,
+    params: 'Write-allocate vs no-write-allocate',
+    question:
+      'On a write miss, a write-allocate cache does what before writing?',
+    options: [
+      'Writes directly to main memory only',
+      'Loads the block from memory into cache, then writes to cache',
+      'Discards the write and retries',
+      'Writes to a special write buffer',
+    ],
+    answer: 1,
+    explanation:
+      'Write-allocate loads the missed block into cache first (just like a read miss), then performs the write to the cached copy. This is typically paired with write-back so future writes to the same block only update the cache.',
+  },
+  {
+    id: 28,
+    params: 'S=1, E=3, B=4, m=8 (fully associative, LRU)',
+    question:
+      'Fully associative cache: S=1, E=3, B=4, m=8 with LRU. Access sequence: 0x00, 0x04, 0x08, 0x0C, 0x00. How many misses?',
+    options: ['3', '4', '5', '2'],
+    answer: 2,
+    explanation:
+      'b=2, s=0, t=6. All addresses map to the single set. 0x00(tag=000000): MISS, cache=[00]. 0x04(tag=000001): MISS, cache=[00,01]. 0x08(tag=000010): MISS, cache=[00,01,10] full. 0x0C(tag=000011): MISS, evict LRU(tag=00) → cache=[01,10,11]. 0x00(tag=000000): MISS (was evicted) → cache=[10,11,00]. Total: 5 misses.',
+  },
+  {
+    id: 29,
+    params: 'm=16, S=8, E=2, B=16',
+    question:
+      'Cache: m=16, S=8, E=2, B=16. b=4, s=3, t=9. What set does address 0xAB12 map to?',
+    options: ['Set 0', 'Set 1', 'Set 2', 'Set 3'],
+    answer: 1,
+    explanation:
+      '0xAB12 = 1010 1011 0001 0010. Offset = bits 0-3 = 0010. Set index = bits 4-6 = 001 = 1. Tag = bits 7-15. Address 0xAB12 maps to set 1.',
+  },
+  {
+    id: 30,
+    params: 'Capacity vs conflict miss',
+    question:
+      'A 2-way set-associative cache has 2 sets (S=2, E=2, 4 lines total). A program accesses blocks A, B (both in set 0), then C (set 0, evicts A), then A again. The re-access of A is a:',
+    options: ['Cold miss', 'Conflict miss', 'Capacity miss', 'Not a miss'],
+    answer: 1,
+    explanation:
+      'Block A was in cache but evicted when C mapped to the same set. A fully associative cache with 4 lines could hold A, B, and C simultaneously (working set = 3 blocks < 4 lines). Since the miss would not occur with a fully associative cache of the same total size, it is a conflict miss — caused by set contention, not insufficient capacity.',
+  },
+  {
+    id: 31,
+    params: 'Stride with doubles',
+    question:
+      'Stride access: word_size=8 bytes (doubles), stride k=4, block size B=64. What is the miss rate?',
+    options: ['25%', '50%', '75%', '100%'],
+    answer: 1,
+    explanation:
+      'Miss rate = min(1, (word_size × k) / B) × 100 = min(1, (8 × 4) / 64) × 100 = min(1, 32/64) × 100 = 50%. Every other cache block boundary is crossed, so half the accesses miss.',
+  },
+  {
+    id: 32,
+    params: 'm=12, S=4, E=1, B=8',
+    question:
+      'Cache: m=12, S=4, E=1, B=8. b=3, s=2, t=7. What is the tag for address 0x3D8?',
+    options: ['0x1E', '0x1F', '0x3D', '0x07'],
+    answer: 0,
+    explanation:
+      '0x3D8 = 0011 1101 1000. Offset (bits 0-2) = 000. Set (bits 3-4) = 11 = set 3. Tag (bits 5-11) = 0011110 = 30 decimal = 0x1E.',
+  },
+  {
+    id: 33,
+    params: 'Write-back dirty eviction',
+    question:
+      'In a write-back cache, when is data written to main memory?',
+    options: [
+      'On every write operation',
+      'When a dirty cache line is evicted',
+      'On every read miss',
+      'Only when the program calls flush',
+    ],
+    answer: 1,
+    explanation:
+      'Write-back only updates main memory when a dirty (modified) cache line is evicted. Writes go to the cache only, and the dirty bit tracks whether the line has been modified. This reduces memory traffic compared to write-through.',
+  },
+  {
+    id: 34,
+    params: 'm=32, S=128, E=4, B=64',
+    question: 'What is the total data capacity of a cache with S=128, E=4, B=64?',
+    options: ['16 KB', '32 KB', '64 KB', '128 KB'],
+    answer: 1,
+    explanation:
+      'Cache size = S × E × B = 128 × 4 × 64 = 32,768 bytes = 32 KB. This counts only data storage, not tag or valid-bit overhead.',
+  },
+  {
+    id: 35,
+    params: 'm=32, S=256, E=1, B=64',
+    question:
+      'Cache: m=32, S=256, E=1, B=64. How many tag bits per address?',
+    options: ['16', '18', '20', '22'],
+    answer: 1,
+    explanation:
+      'b = log₂(64) = 6. s = log₂(256) = 8. t = m - s - b = 32 - 8 - 6 = 18 tag bits.',
+  },
+  {
+    id: 36,
+    params: 'S=1, E=2, B=8, m=8 (LRU)',
+    question:
+      'Fully associative cache: S=1, E=2, B=8, m=8, LRU. Access 0x00, then 0x08, then 0x10. Which block is evicted on the third access?',
+    options: ['The block containing 0x00', 'The block containing 0x08', 'The block containing 0x10', 'No eviction needed'],
+    answer: 0,
+    explanation:
+      'b=3, s=0, t=5. 0x00 (tag=00000): MISS, load → cache=[0x00]. 0x08 (tag=00001): MISS, load → cache=[0x00(LRU), 0x08(MRU)]. 0x10 (tag=00010): MISS, cache full → evict LRU = 0x00 block. The block containing 0x00 is evicted.',
+  },
+  {
+    id: 37,
+    params: 'm=16, S=32, E=1, B=16',
+    question:
+      'Cache: m=16, S=32, E=1, B=16. b=4, s=5, t=7. What set does address 0x4E20 map to?',
+    options: ['Set 0', 'Set 2', 'Set 14', 'Set 4'],
+    answer: 1,
+    explanation:
+      '0x4E20 = 0100 1110 0010 0000. Offset (bits 0-3) = 0000. Set index (bits 4-8) = 00010 = 2. Tag (bits 9-15) = 0100111. Address 0x4E20 maps to set 2.',
+  },
+  {
+    id: 38,
+    params: 'No-write-allocate behavior',
+    question:
+      'On a write miss with no-write-allocate policy, what happens?',
+    options: [
+      'The block is loaded into cache, then written',
+      'The write goes directly to main memory; the block is NOT loaded into cache',
+      'The write is dropped silently',
+      'The cache performs a read miss first',
+    ],
+    answer: 1,
+    explanation:
+      'No-write-allocate (also called write-around) sends the write directly to main memory without loading the block into cache. This avoids polluting the cache with data that may not be read soon. Typically paired with write-through.',
+  },
+  {
+    id: 39,
+    params: 'S=2, E=2, B=4, m=8',
+    question:
+      'Cache: S=2, E=2, B=4, m=8. b=2, s=1, t=5. Addresses 0x00 and 0x08 both map to set 0 and fill it. Later, 0x00 is accessed again (hit), then 0x08 is evicted by 0x10. On the next access to 0x08, what type of miss occurs?',
+    options: ['Cold miss', 'Conflict miss', 'Capacity miss', 'Compulsory miss'],
+    answer: 1,
+    explanation:
+      '0x08 was previously in the cache but was evicted because a third block (0x10) mapped to the same set. The cache has 4 total lines (enough to hold 0x00, 0x08, and 0x10 if fully associative), so this is a conflict miss — caused by set contention, not insufficient total capacity.',
+  },
+  {
+    id: 40,
+    params: 'Stride >= block size',
+    question:
+      'Stride access: word_size=4 bytes, stride k=32 words, block B=64 bytes. What is the miss rate?',
+    options: ['50%', '75%', '100%', '25%'],
+    answer: 2,
+    explanation:
+      'Miss rate = min(1, (word_size × k) / B) × 100 = min(1, (4 × 32) / 64) × 100 = min(1, 128/64) × 100 = min(1, 2) × 100 = 100%. The stride (128 bytes) exceeds the block size (64 bytes), so every access misses — no spatial locality benefit.',
   },
 ]

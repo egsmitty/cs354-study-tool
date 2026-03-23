@@ -51,9 +51,9 @@ export const heapProblems = [
     heapState: null,
     question: 'A block header encodes size=48, the previous block is free, and this block is free. What is the header value?',
     options: ['48', '49', '50', '51'],
-    answer: 2,
+    answer: 0,
     explanation:
-      'Header bits: size=48 (bits 31-3), p-bit=1 (prev allocated? NO — prev is free → p-bit=0), a-bit=0 (this block is free). So 48 | 0 | 0 = 48... wait: prev is FREE so p-bit=0. a-bit=0. 48 | 0b10 = 50. Prev allocated=1 means p-bit=1. Prev free means p-bit=0. a-bit=0. So 48 | 0b10 | 0b00 = 48+2 = 50.',
+      'Previous block is free → p-bit=0. This block is free → a-bit=0. Header = size | p-bit | a-bit = 48 | 0b00 | 0b0 = 48.',
   },
   {
     id: 7,
@@ -104,11 +104,11 @@ export const heapProblems = [
   {
     id: 11,
     heapState: '[16/0][32/0][16/1][64/0]',
-    question: 'How many bytes of contiguous free memory are available after coalescing?',
+    question: 'How many total free bytes are available after coalescing?',
     options: ['16', '32', '48', '112'],
     answer: 3,
     explanation:
-      'The 16/0 and 32/0 blocks are adjacent free blocks → they coalesce to 48. The 64/0 block is separated by an allocated block (16/1) so it stays separate. The 48-byte block is the largest contiguous free region. Wait — 16+32=48 but 64 is also free but separated. The question asks for largest contiguous free: 64 bytes is larger. Actually all free bytes = 16+32+64=112 but largest contiguous = 64 after coalescing 16+32=48. Hmm, the answer should be 64 (separate block). Let me re-evaluate: largest single contiguous = 64. But 16+32 coalesce to 48. So largest is 64. Actually the question asks total free bytes = 16+32+64=112.',
+      'The 16/0 and 32/0 blocks are adjacent free blocks → they coalesce into one 48-byte free block. The 64/0 block is separated by the allocated 16/1 block so it stays separate. Total free bytes = 48 + 64 = 112.',
   },
   {
     id: 12,
@@ -283,9 +283,9 @@ export const heapProblems = [
       '[16/0][48/0][16/1][48/0][16/1] (no coalescing possible)',
       '[128/0][16/1]',
     ],
-    answer: 2,
+    answer: 1,
     explanation:
-      'The freed 16-byte block is at the start. The next block (48/0) is already free, so they coalesce → 64-byte free block. But wait, the first block is the FIRST block, and the previous block is the heap prologue (always allocated). So only forward coalescing happens: 16+48=64. State: [64/0][16/1][48/0][16/1].',
+      'The freed 16-byte block is at the start of the heap. The previous block is the heap prologue (always allocated), so no backward coalescing. The next block (48/0) is free, so forward coalescing happens: 16 + 48 = 64. Result: [64/0][16/1][48/0][16/1].',
   },
   {
     id: 25,
@@ -300,5 +300,115 @@ export const heapProblems = [
     answer: 1,
     explanation:
       'Between any two consecutive heap blocks there is always at least a header. The payload of the second block starts at: (start of first payload) + (first block size including header). So the payloads are NOT contiguous — the header of the second block sits between them.',
+  },
+  {
+    id: 26,
+    heapState: null,
+    question:
+      'A block has size=64, is allocated, and the previous block is also allocated. Using 3-bit encoding (bit 0=a-bit, bit 1=p-bit), what is the header value in hex?',
+    options: ['0x40', '0x41', '0x42', '0x43'],
+    answer: 3,
+    explanation:
+      'Size = 64 = 0x40. a-bit = 1 (allocated). p-bit = 1 (prev allocated) → bit 1 = 1 means +2. Header = 0x40 | 0x02 | 0x01 = 0x43 = 67 decimal.',
+  },
+  {
+    id: 27,
+    heapState: null,
+    question:
+      'Free blocks in order: [64][16][32][48]. Using best-fit, which block does malloc(30) choose?',
+    options: ['64-byte block', '16-byte block', '32-byte block', '48-byte block'],
+    answer: 2,
+    explanation:
+      'Best-fit selects the smallest free block that can satisfy the request. 16 < 30 (too small). 32 ≥ 30 (fits, remainder=2). 48 ≥ 30 (fits, remainder=18). 64 ≥ 30 (fits, remainder=34). The 32-byte block is the smallest fit.',
+  },
+  {
+    id: 28,
+    heapState: '[32/1][32/0][32/1]',
+    question:
+      'The third block (32/1) is freed. Its header has p-bit=0 (previous block is free). After coalescing, what is the heap?',
+    options: ['[32/1][32/0][32/0]', '[32/1][64/0]', '[96/0]', '[32/1][32/0][32/0] — no coalescing'],
+    answer: 1,
+    explanation:
+      'When the third block is freed, the allocator checks: p-bit=0 → previous block is free → coalesce backward by reading the previous block\'s footer to get its size (32). Merged block = 32 + 32 = 64. The first block (32/1) is allocated, so no further backward coalescing. Result: [32/1][64/0].',
+  },
+  {
+    id: 29,
+    heapState: null,
+    question:
+      'A block has size=80, is allocated, and the previous block is allocated. Using 3-bit encoding (bit 0=a-bit, bit 1=p-bit), what is the header value in hex?',
+    options: ['0x50', '0x51', '0x52', '0x53'],
+    answer: 3,
+    explanation:
+      'Size = 80 = 0x50. a-bit = 1 (allocated), p-bit = 1 (prev allocated, bit 1). Header = 0x50 | 0x02 | 0x01 = 0x53 = 83 decimal.',
+  },
+  {
+    id: 30,
+    heapState: '[32/0][16/1][16/0][8/1][32/0]',
+    question:
+      'The rover (for next-fit) is currently at the 16-byte free block. malloc(12) is called. Which block does next-fit select?',
+    options: ['First 32-byte free block', 'The 16-byte free block', 'Second 32-byte free block', 'None — allocation fails'],
+    answer: 1,
+    explanation:
+      'Next-fit starts searching from the rover position. The rover is at the 16-byte free block. 16 ≥ 12 → it fits. Next-fit selects this block without scanning further. First-fit would have chosen the first 32-byte block instead.',
+  },
+  {
+    id: 31,
+    heapState: null,
+    question:
+      'With an explicit free list, 4-byte headers, 4-byte footers, 4-byte pointers (next/prev), and 8-byte alignment, what is the minimum free block size?',
+    options: ['8 bytes', '12 bytes', '16 bytes', '24 bytes'],
+    answer: 2,
+    explanation:
+      'A free block needs: header (4B) + next pointer (4B) + prev pointer (4B) + footer (4B) = 16 bytes. This must also be a multiple of the alignment (8). 16 is already a multiple of 8. Minimum free block = 16 bytes.',
+  },
+  {
+    id: 32,
+    heapState: '[16/0][32/1][16/0]',
+    question:
+      'The middle block (32/1) is freed. Both neighbors are free. After immediate coalescing, what is the heap?',
+    options: ['[16/0][32/0][16/0]', '[48/0][16/0]', '[16/0][48/0]', '[64/0]'],
+    answer: 3,
+    explanation:
+      'When the 32-byte block is freed: next block (16/0) is free → forward coalesce: 32+16=48. Previous block (16/0) is free → backward coalesce: 16+48=64. All three merge into one 64-byte free block: [64/0].',
+  },
+  {
+    id: 33,
+    heapState: null,
+    question:
+      'A header value is 0x4B. What is the block size, allocation status, and previous block status? (bit 0=a-bit, bit 1=p-bit)',
+    options: [
+      'Size=72, free, prev free',
+      'Size=72, allocated, prev allocated',
+      'Size=75, allocated, prev free',
+      'Size=72, allocated, prev free',
+    ],
+    answer: 1,
+    explanation:
+      '0x4B = 75 decimal = 0b01001011. a-bit (bit 0) = 1 → allocated. p-bit (bit 1) = 1 → previous block is allocated. Size = 0x4B & ~0x7 = 0x48 = 72 bytes.',
+  },
+  {
+    id: 34,
+    heapState: null,
+    question:
+      'An allocator considers splitting a 64-byte free block for a malloc(48) request. The minimum block size is 16 bytes. Should it split?',
+    options: [
+      'Yes — remainder is 16 bytes, which meets the minimum',
+      'No — remainder of 16 bytes is too small',
+      'Yes — always split regardless of remainder',
+      'No — 48 does not fit in 64 bytes with overhead',
+    ],
+    answer: 0,
+    explanation:
+      'After allocating 48 bytes from the 64-byte block, the remainder is 64 - 48 = 16 bytes. Since 16 ≥ minimum block size (16), the allocator should split: allocate the first 48 bytes and create a new 16-byte free block from the remainder.',
+  },
+  {
+    id: 35,
+    heapState: '[32/1][24/0][16/1][24/0][8/1]',
+    question:
+      'Total free space is 48 bytes. What is the largest single allocation that can succeed?',
+    options: ['32 bytes', '24 bytes', '48 bytes', '16 bytes'],
+    answer: 1,
+    explanation:
+      'The two free blocks are 24 bytes and 24 bytes, separated by the allocated 16/1 block. They cannot be coalesced. The largest contiguous free block is 24 bytes. malloc(25) or larger would fail despite 48 total free bytes — this is external fragmentation.',
   },
 ]
